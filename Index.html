@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Simulator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #007BFF;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .stock, .company {
+            border-bottom: 1px solid #ddd;
+            padding: 15px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .stock:last-child, .company:last-child {
+            border-bottom: none;
+        }
+        .stock h2, .company h2 {
+            margin: 0;
+        }
+        .stock p, .company p {
+            margin: 5px 0;
+        }
+        .actions {
+            display: flex;
+            align-items: center;
+        }
+        .actions button {
+            margin-right: 10px;
+            padding: 5px 10px;
+            color: #fff;
+            background-color: #007BFF;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .actions button:hover {
+            background-color: #0056b3;
+        }
+        .actions input {
+            width: 50px;
+            padding: 5px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #transaction-history {
+            margin-top: 20px;
+        }
+        #transaction-history h3 {
+            margin-bottom: 10px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        ul li {
+            background-color: #f1f1f1;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Business Simulator</h1>
+        <div class="section">
+            <h2>Balance: <span id="balance">$1000.00</span></h2>
+        </div>
+        <div class="section" id="stocks">
+            <h3>Stocks</h3>
+        </div>
+        <div class="section">
+            <h3>Own Company</h3>
+            <div id="own-company" class="company">
+                <div>
+                    <h2>Your Company</h2>
+                    <p>Products: <span id="products">0</span></p>
+                    <p>Cost to Produce Product: $3.00</p>
+                    <p>Sell Price per Product: <span id="product-price">$5.00</span></p>
+                </div>
+                <div class="actions">
+                    <button onclick="produceProduct()">Produce Product</button>
+                    <button onclick="sellProducts()">Sell Products</button>
+                    <button onclick="upgradeProduction()">Upgrade Production</button>
+                </div>
+            </div>
+            <div class="company">
+                <div>
+                    <h2>Automation</h2>
+                    <p>Auto-Produce Rate: <span id="auto-produce-rate">0</span> per second</p>
+                    <p>Auto-Sell Rate: <span id="auto-sell-rate">0</span> per second</p>
+                </div>
+                <div class="actions">
+                    <button onclick="buyAutoProduce()">Buy Auto-Produce ($100)</button>
+                    <button onclick="sellAutoProduce()">Sell Auto-Produce ($50)</button>
+                    <button onclick="buyAutoSell()">Buy Auto-Sell ($100)</button>
+                    <button onclick="sellAutoSell()">Sell Auto-Sell ($50)</button>
+                </div>
+            </div>
+        </div>
+        <div id="transaction-history" class="section">
+            <h3>Transaction History</h3>
+            <ul id="history-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        const initialBalance = 1000;
+        let balance = initialBalance;
+        let products = 0;
+        const produceCost = 3;
+        let productPrice = 5;
+        let productionRate = 1;
+        let autoProduceRate = 0;
+        let autoSellRate = 0;
+        const autoProduceCost = 100;
+        const autoSellCost = 100;
+        const autoProduceSellPrice = 50;
+        const autoSellSellPrice = 50;
+        const stocks = [
+            { name: 'Tech Innovators Inc.', price: 120, owned: 0 },
+            { name: 'Green Energy Co.', price: 180, owned: 0 },
+            { name: 'Global Retail Ltd.', price: 240, owned: 0 },
+        ];
+        const transactionHistory = [];
+
+        function updateUI() {
+            document.getElementById('balance').innerText = `$${balance.toFixed(2)}`;
+            document.getElementById('products').innerText = products;
+            document.getElementById('product-price').innerText = `$${productPrice.toFixed(2)}`;
+            document.getElementById('auto-produce-rate').innerText = autoProduceRate;
+            document.getElementById('auto-sell-rate').innerText = autoSellRate;
+            const stocksDiv = document.getElementById('stocks');
+            stocksDiv.innerHTML = '';
+            stocks.forEach((stock, index) => {
+                const stockDiv = document.createElement('div');
+                stockDiv.className = 'stock';
+                stockDiv.innerHTML = `
+                    <div>
+                        <h2>${stock.name}</h2>
+                        <p>Price: $${stock.price.toFixed(2)}</p>
+                        <p>Owned: ${stock.owned}</p>
+                    </div>
+                    <div class="actions">
+                        <input type="number" id="quantity-${index}" value="1" min="1">
+                        <button onclick="buyStock(${index})">Buy</button>
+                        <button onclick="sellStock(${index})">Sell</button>
+                    </div>
+                `;
+                stocksDiv.appendChild(stockDiv);
+            });
+            updateTransactionHistory();
+        }
+
+        function updateTransactionHistory() {
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';
+            transactionHistory.forEach(transaction => {
+                const li = document.createElement('li');
+                li.textContent = transaction;
+                historyList.appendChild(li);
+            });
+        }
+
+        function buyStock(index) {
+            const quantity = parseInt(document.getElementById(`quantity-${index}`).value);
+            const cost = stocks[index].price * quantity;
+            if (balance >= cost) {
+                balance -= cost;
+                stocks[index].owned += quantity;
+                transactionHistory.unshift(`Bought ${quantity} of ${stocks[index].name} for $${cost.toFixed(2)}`);
+                updateUI();
+            } else {
+                alert('Not enough balance to buy stocks');
+            }
+        }
+
+        function sellStock(index) {
+            const quantity = parseInt(document.getElementById(`quantity-${index}`).value);
+            if (stocks[index].owned >= quantity) {
+                const revenue = stocks[index].price * quantity;
+                balance += revenue;
+                stocks[index].owned -= quantity;
+                transactionHistory.unshift(`Sold ${quantity} of ${stocks[index].name} for $${revenue.toFixed(2)}`);
+                updateUI();
+            } else {
+                alert('Not enough stocks to sell');
+            }
+        }
+
+        function fluctuateStockPrices() {
+            stocks.forEach(stock => {
+                const changePercent = (Math.random() - 0.5) * 0.1; // Random change between -5% and +5%
+                stock.price += stock.price * changePercent;
+                if (stock.price < 1) stock.price = 1; // Minimum price of $1
+            });
+            // Simulate inflation/deflation on product price
+            const priceChangePercent = (Math.random() - 0.5) * 0.1;
+            productPrice += productPrice * priceChangePercent;
+            if (productPrice < 1) productPrice = 1; // Minimum price of $1
+            updateUI();
+        }
+
+        function produceProduct() {
+            const cost = produceCost * productionRate;
+            if (balance >= cost) {
+                balance -= cost;
+                products += productionRate;
+                transactionHistory.unshift(`Produced ${productionRate} products at a cost of $${cost.toFixed(2)}`);
+                updateUI();
+            } else {
+                alert('Not enough balance to produce products');
+            }
+        }
+
+        function sellProducts() {
+            if (products > 0) {
+                const revenue = products * productPrice;
+                balance += revenue;
+                transactionHistory.unshift(`Sold ${products} products for $${revenue.toFixed(2)}`);
+                products = 0;
+                updateUI();
+            } else {
+                alert('No products to sell');
+            }
+        }
+
+        function upgradeProduction() {
+            const upgradeCost = 100 * productionRate;
+            if (balance >= upgradeCost) {
+                balance -= upgradeCost;
+                productionRate += 1;
+                transactionHistory.unshift(`Upgraded production rate to ${productionRate}`);
+                updateUI();
+            } else {
+                alert('Not enough balance to upgrade production');
+            }
+        }
+
+        function buyAutoProduce() {
+            if (balance >= autoProduceCost) {
+                balance -= autoProduceCost;
+                autoProduceRate += 1;
+                transactionHistory.unshift(`Increased auto-produce rate to ${autoProduceRate} per second`);
+                updateUI();
+            } else {
+                alert('Not enough balance to buy auto-produce');
+            }
+        }
+
+        function sellAutoProduce() {
+            if (autoProduceRate > 0) {
+                balance += autoProduceSellPrice;
+                autoProduceRate -= 1;
+                transactionHistory.unshift(`Decreased auto-produce rate to ${autoProduceRate} per second`);
+                updateUI();
+            } else {
+                alert('No auto-produce units to sell');
+            }
+        }
+
+        function buyAutoSell() {
+            if (balance >= autoSellCost) {
+                balance -= autoSellCost;
+                autoSellRate += 1;
+                transactionHistory.unshift(`Increased auto-sell rate to ${autoSellRate} per second`);
+                updateUI();
+            } else {
+                alert('Not enough balance to buy auto-sell');
+            }
+        }
+
+        function sellAutoSell() {
+            if (autoSellRate > 0) {
+                balance += autoSellSellPrice;
+                autoSellRate -= 1;
+                transactionHistory.unshift(`Decreased auto-sell rate to ${autoSellRate} per second`);
+                updateUI();
+            } else {
+                alert('No auto-sell units to sell');
+            }
+        }
+
+        function autoProduce() {
+            const cost = produceCost * autoProduceRate;
+            if (balance >= cost && autoProduceRate > 0) {
+                balance -= cost;
+                products += autoProduceRate;
+                transactionHistory.unshift(`Auto-produced ${autoProduceRate} products at a cost of $${cost.toFixed(2)}`);
+                updateUI();
+            }
+        }
+
+        function autoSell() {
+            if (products >= autoSellRate && autoSellRate > 0) {
+                const revenue = autoSellRate * productPrice;
+                balance += revenue;
+                products -= autoSellRate;
+                transactionHistory.unshift(`Auto-sold ${autoSellRate} products for $${revenue.toFixed(2)}`);
+                updateUI();
+            }
+        }
+
+        setInterval(fluctuateStockPrices, 5000); // Update stock prices and product price every 5 seconds
+        setInterval(autoProduce, 1000); // Auto-produce every second
+        setInterval(autoSell, 1000); // Auto-sell every second
+
+        updateUI();
+    </script>
+</body>
+</html>
